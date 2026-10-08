@@ -1,0 +1,7 @@
+interface:
+  display_name: "Java Risk"
+  short_description: "审查Java后端高中风险业务逻辑数据一致性与设计问题"
+  default_prompt: "Use $java-risk to review this Java backend project for high and medium business and code risks."
+
+policy:
+  allow_implicit_invocation: false
