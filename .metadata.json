@@ -4,6 +4,8 @@
     "_archify": {
       "source": "https://github.com/tt-a1i/archify.git",
       "type": "github",
+      "tracked": true,
+      "branch": "main",
       "installed_at": "2026-09-03T13:52:31.271505+08:00",
       "repo_url": "https://github.com/tt-a1i/archify.git",
       "version": "06dd052",
@@ -484,6 +486,8 @@
     "_hallmark": {
       "source": "https://github.com/Nutlope/hallmark.git",
       "type": "github",
+      "tracked": true,
+      "branch": "main",
       "installed_at": "2026-09-03T13:52:38.277396+08:00",
       "repo_url": "https://github.com/Nutlope/hallmark.git",
       "version": "13ac0ec",
@@ -779,6 +783,8 @@
     "_skills": {
       "source": "https://github.com/mattpocock/skills.git",
       "type": "github",
+      "tracked": true,
+      "branch": "main",
       "installed_at": "2026-09-03T13:53:05.197546+08:00",
       "repo_url": "https://github.com/mattpocock/skills.git",
       "version": "6654f6b",
@@ -952,6 +958,8 @@
     "_superpowers": {
       "source": "https://github.com/obra/superpowers.git",
       "type": "github",
+      "tracked": true,
+      "branch": "main",
       "installed_at": "2026-09-03T13:53:00.610098+08:00",
       "repo_url": "https://github.com/obra/superpowers.git",
       "version": "b36e082",
@@ -1156,6 +1164,8 @@
     "_taste-skill": {
       "source": "https://github.com/Leonxlnx/taste-skill.git",
       "type": "github",
+      "tracked": true,
+      "branch": "main",
       "installed_at": "2026-09-03T13:52:16.494215+08:00",
       "repo_url": "https://github.com/Leonxlnx/taste-skill.git",
       "version": "ccbc156",
@@ -1225,6 +1235,11 @@
         "skills/taste-skill-v1/SKILL.md": "sha256:033d45af1ed23832730642f95f40ab49db7fb5222848489a6c5656144bfc6dae",
         "skills/taste-skill/SKILL.md": "sha256:aa194351b246b8b4799099d4ed7b033d29eab6e6e3d58d8d2172978be7b3ec89"
       }
+    },
+    "_wanxiang-build": {
+      "source": "https://github.com/Cjy-CN/wanxiang-build.git",
+      "tracked": true,
+      "branch": "main"
     },
     "apifox-branch": {
       "source": "~/.agents/skills//apifox-branch",
@@ -1369,7 +1384,6 @@
       "subdir": "skills/skillshare",
       "version": "3bc8d66",
       "tree_hash": "e8ed521cb87dbb4d8193458a98c6269ef1bfda7d",
-      "commit": "3bc8d6669bab61303d4fd6dba7f05baaf8bd890b",
       "file_hashes": {
         "SKILL.md": "sha256:ca712e437be1fd6b5a0bfe944a631fc5297b36f1e7d985f481e833a1fb3f0054",
         "references/TROUBLESHOOTING.md": "sha256:6964001f3f1fcbaadf0daae7478724ffd12196c20c7b3762876385670660cd99",
