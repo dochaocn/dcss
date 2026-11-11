@@ -37,6 +37,7 @@ skillshare extras init rules --no-tui ... # Skip prompts
 | `--as <filename>` | File name at every target (default: `--file` name); requires `--file` |
 | `--mode <mode>` | Sync mode: `merge` (default), `copy`, `symlink`; `import`, `prepend` or `append` only with `--file` |
 | `--flatten` | Sync subdirectory files into the target root; not with `symlink` or `--file` |
+| `--include` / `--exclude <pattern>` | Sync only / skip matching files (`.gitignore` syntax on the path inside the source; repeatable); not with `symlink` or `--file` |
 | `--no-tui` | Skip interactive prompts |
 | `-p` / `-g` | Force project / global mode |
 
@@ -51,6 +52,16 @@ skillshare extras personal --add-target ~/.claude --as CLAUDE.md --mode import
 
 `--as` sets the target filename for a single-file extra; it defaults to `file`.
 Run `skillshare sync extras` after adding the target.
+
+```bash
+skillshare extras docs --target ~/.claude/docs --add-include index.md
+skillshare extras docs --target ~/.cursor/docs --add-exclude "draft*" --add-exclude images/
+```
+
+`--add-include`, `--add-exclude`, `--remove-include` and `--remove-exclude` change one
+target's file filters. A pattern without `/` matches at any depth; `dir/` covers a folder.
+The next sync removes links to files that stop matching in `merge` mode; `copy` mode leaves
+copied files in place. `sync` warns when an include matches no file.
 
 ## extras list
 
@@ -323,10 +334,13 @@ CLI `instructions [--update-mode passive|active]` only prints the same block. Pr
 are relative to the project root, regardless of the instruction file's location;
 external overrides and global sources use absolute paths.
 
-A configured tool has the current guidance; this does not prove a read. Use a
-fresh session and **Copy verification prompt** to request `INDEX.md` and a relevant
-note, its full path, and a temporary verification value you added. Inspect the
-actual file read event manually. There is no guaranteed read telemetry.
+A configured tool has the current guidance; this does not prove a read. In
+**Memory tools → Try across sessions**, copy the save, fresh-session read, and
+cleanup prompts. The read prompt omits the temporary verification value. Inspect
+the actual read event, full path, and returned value manually. There is no
+guaranteed read telemetry. For session retrospectives or Dreaming over saved
+notes, read [memory-review.md](memory-review.md); the host agent performs the
+review and applies approved edits, never Skillshare.
 
 **New note** offers **Link from INDEX.md**, default checked with a readable index.
 It appends a link at EOF with a version check and backup; a failed link leaves

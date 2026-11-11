@@ -22,13 +22,37 @@ skillshare sync --json         # JSON output
 skillshare sync -g             # Force global mode
 ```
 
-Sync runs every target. A target whose sync fails, or whose own settings are invalid (for example a skills path that is a file), is reported as failed and skipped; the rest still sync and the command exits non-zero. Config-wide problems (source, global `mode`/`target_naming`, `git_root`, extras) still stop sync before any target runs. Under `target_naming: standard`, a skill name must equal its directory name and use at most 64 lowercase letters (any script), digits and single hyphens, with no leading or trailing `-` and no underscores; other skills are warned and skipped.
+Before linking, `sync` adopts the install record of a skill moved by hand (`mv`) when exactly one unchanged copy with that name exists; it never removes a record. `--dry-run` adopts nothing.
+
+In project mode, adoption updates only the moved declared skill's config entry,
+ignore rule and existing lock pin. A stale record without a move leaves those
+files unchanged; unrelated remote installs are not added to the project manifest.
+
+Sync runs every target. A target whose sync fails, or whose own settings are invalid (for example a skills path that is a file), is reported as failed and skipped; the rest still sync and the command exits non-zero. Config-wide problems (source, global `mode`/`target_naming`, `git_root`, extras) still stop sync before any target runs. Under `target_naming: standard`, a skill name must equal its directory name and use at most 64 lowercase letters (any script), digits and single hyphens, with no leading or trailing `-` and no underscores; other skills are warned and skipped. `target_naming: prefixed` (copy mode only; merge or symlink targets fail validation, and `status` and `doctor` flag them before sync, `target list` too for targets under `targets:`, with the fix `mode: copy`) applies the same rules except that `name:` need not match the directory (sync lists such skills), then names each skill inside a tracked repo `<repo>-<name>` (repo folder without `_`, e.g. `mattpocock-skills-prototype`) in both the folder and the copy's `name:`, so same-named skills from different repos both sync; a name already starting with the repo is kept, and prefixed names over 64 characters are skipped. Switching between namings renames managed entries in place; switching away from `prefixed`, a skill whose `name:` differs from its directory is copied again and its old copy pruned.
 
 ### Sync modes (quick reference)
 
 - `merge` (default): per-skill symlinks, preserves local target skills.
 - `copy`: real-file copies with `.skillshare-manifest.json` tracking managed entries.
 - `symlink`: whole target directory symlinked to source.
+
+Tracked repositories with `skills/<known-agent>/<skill-path>/SKILL.md` use exact
+agent routing in merge/copy mode only when the same complete suffix occurs beneath
+at least two distinct canonical agents under the same `skills/` parent. A lone
+agent-like category remains ordinary. Canonical aliases and account `agent:`
+identities match. Compatible targets sharing a skills folder select the union of
+their agent identities, preserving each other's managed variants; incompatible
+settings retain overlap/conflict diagnostics. Source-local target overrides beat nonempty
+frontmatter targets, then variant inference, then old host-path inference. An empty
+override sends that physical variant to all targets. Ignores and filters keep using
+physical relative/flat names, and ambiguous aliases need an explicit selection.
+Agent-named folders that contain their own SKILL.md remain ordinary skills, including their nested skills.
+Source/repository status counts logical skills and reports physical variants;
+resource rows, sync results, and context cost count actual files. Full-directory
+symlink mode exposes all files. No conversion or sparse checkout is performed.
+On upgrade, merge/copy removes previously managed variants that do not match the
+target's Agent, with an automatic-routing warning (also in dry-run). Restore a
+desired copy with a source-local target override; an empty override targets all.
 
 Copy mode note:
 - `skillshare doctor` duplicate checks ignore manifest-managed copy entries (expected mirrors of source).

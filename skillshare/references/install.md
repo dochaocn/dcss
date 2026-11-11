@@ -1,4 +1,4 @@
-# Install, Update, Uninstall & New
+# Install, Update, Uninstall, Move & New
 
 Use `-p` for project resources or `-g` for global resources. For native agent workflows,
 see [native-agents.md](native-agents.md). These examples use skills unless specified otherwise.
@@ -6,6 +6,25 @@ see [native-agents.md](native-agents.md). These examples use skills unless speci
 ## install
 
 Install skills from local path or git repository.
+
+Skills normally keep their directory name. For generic `skill` or `skills` directories,
+a valid `SKILL.md` frontmatter `name` is used, lowercased with spaces normalized to hyphens
+(e.g. `MinerU Document Extractor` → `mineru-document-extractor`). Missing, invalid,
+or conflicting frontmatter names fall back to the directory name. `--name` overrides the default; updates
+preserve existing install names. Tracked repository naming is unchanged.
+
+Discovery skips target directories such as `.claude/` and `.agents/`, which usually
+hold copies of a repository's skills. A repository with no other skills has its
+root `.agents/skills/` discovered instead.
+
+For an explicit, untracked skill source, `install <source> --dry-run --json`
+returns `planned: [{name, path}]`: canonical install names and repository-relative
+Git paths (including a selected subdirectory), or `.` for a local skill. Use this
+instead of scanning for `SKILL.md` or guessing names. Discovery, `.skillignore`, and
+selection rules apply; without a filter JSON mode selects all. `skills` remains
+empty during dry-run. An empty discovered selection returns `planned: []`;
+tracked and config-based installs omit the field. Check the exit status as well
+as `error`, including when consuming JSON from older CLIs.
 
 ### Source Formats
 
@@ -59,6 +78,49 @@ skillshare install anthropics/skills -s pdf -p        # Selective + project mode
 skillshare install user/repo --skip-audit             # Skip security scan
 ```
 
+### Track a collection without a picker
+
+`--track` keeps the repository (or Git subdirectory) as one checkout, with its
+Git metadata for updates. It is useful for personal upstream collections as
+well as team repositories. With a plain `owner/repo` source (no URL ref), omit
+`--branch` to start tracking its default branch (usually `main`), then use
+`update` to pull that branch's latest changes. Tracking does not
+schedule updates. It does not need `--all` or `--yes`; both are rejected,
+as are `--skill` and `--agent`. To install selected skills separately, use `-s`.
+Combining `--skill` with `--track`, `--all`, or `--yes` is rejected.
+
+```bash
+skillshare install owner/repo --track --name team -g --dry-run
+skillshare install owner/repo --track --name team -g
+skillshare list -g --json
+skillshare target claude -g
+# Only if this target already uses an allowlist, add the desired discovered name/pattern:
+skillshare target claude --add-include '_team__*' -g
+skillshare sync -g --dry-run
+skillshare sync -g
+skillshare status -g --json
+```
+
+Preserve existing target filters. Adding the first include pattern creates an
+allowlist and can exclude other skills. Patterns match flattened source names
+reported by `list` (for example, `_team__skills__pdf`), even when target naming
+produces a shorter folder name. Do not guess names from the repository basename.
+Target filters control exposure without removing files from the tracked checkout;
+install-time selection is a different operation. Symlink mode ignores filters;
+choose merge/copy mode before relying on them.
+
+Use `-p` instead of `-g` throughout for a project. Add `--branch BRANCH` to
+follow a specific upstream branch. Tracked repositories must follow a branch;
+to pin a tag or commit, install without `--track`. Use a source such as
+`owner/repo/skills` to track only that Git subdirectory. Review audit findings
+before applying; do not use `--force` as a noninteractive shortcut.
+
+Later, run `check _team -g --json`, `update _team -g`, then `sync -g` (each with
+the `skillshare` prefix). Sync does not fetch upstream changes. A complete native
+plugin uses [the plugin lifecycle](plugins.md), not `install --track`.
+If the tracked source contains both skills and agents, specify `--kind skill`
+or `--kind agent` to choose which resource to manage.
+
 ### Flags
 
 | Flag | Description |
@@ -70,15 +132,15 @@ skillshare install user/repo --skip-audit             # Skip security scan
 | `--branch, -b <name>` | Select a Git branch, tag or commit SHA (overrides a ref in a web URL) |
 | `--force, -f` | Overwrite existing and explicitly override audit blocking |
 | `--update, -u` | Update if exists |
-| `--track, -t` | Track for updates (preserves .git) |
-| `--skill, -s <names>` | Select specific skills from multi-skill repo (comma-separated) |
+| `--track, -t` | Track for updates (preserves .git); a local path works if it is a git repository. Rejects `--all`, `--yes`, `--skill`, and `--agent` |
+| `--skill, -s <names>` | Select specific skills from multi-skill repo (comma-separated). Rejects `--track`, `--all`, and `--yes` |
 | `--into <dir>` | Install into subdirectory (e.g., `--into frontend`) |
 | `--all` | Install all discovered skills without prompting |
 | `--yes, -y` | Auto-accept all prompts (CI/CD friendly) |
 | `--exclude <name>` | Skip specific skills during multi-skill install (repeatable) |
 | `--skip-audit` | Skip security audit for this install |
 | `--audit-threshold <t>` / `--threshold <t>` / `-T <t>` | Override block threshold for this run (`critical\|high\|medium\|low\|info`; shorthand: `c\|h\|m\|l\|i`, plus `crit`, `med`) |
-| `--json` | Noninteractive JSON; permits overwrite and selects all when no skill/agent filter is given; retains audit blocking |
+| `--json` | Noninteractive JSON; permits overwrite and selects all when no skill/agent filter is given; retains audit blocking; when every skill fails or is blocked it exits non-zero with an `error` field naming each one, while a partial failure lists names in `failed` and exits 0 |
 | `--dry-run, -n` | Preview |
 
 **Fuzzy subdirectory resolution:** When a monorepo has nested skill directories, you can specify just the skill name — e.g., `user/repo/vue-best-practices` finds `skills/vue-best-practices/` automatically. Fails with an error if multiple matches exist.
@@ -112,10 +174,12 @@ Check for available updates and validate skill metadata.
 skillshare check             # Show update status for all repos/skills
 skillshare check --json      # JSON output (CI-friendly)
 skillshare check -p          # Check project skills
+skillshare check my-skill --diff  # Show local edits vs the installed version
 ```
 
 - **Tracked repos:** Fetches from origin, shows commits behind
 - **Remote skills:** Compares installed version with remote HEAD
+- **Modified skills:** Remote skills edited since install are `modified`; `update` skips them until `--force`. `check <name> --diff` shows the edits
 - **Local skills:** Shown as "local source"
 - **Targets validation:** Warns about unknown target names in skill-level `targets` field
 
@@ -127,7 +191,7 @@ With `follow_source_links: true`, check a followed Git checkout by its link name
 Update installed skills or tracked repositories.
 
 - **Tracked repos (`_repo-name`):** Runs `git pull`
-- **Regular skills:** Reinstalls from stored source metadata
+- **Regular skills:** Reinstalls from stored source metadata. `--all`, `--group`, and several skills named with `-p` skip the ones already at the upstream commit and report them as up to date; `--force` reinstalls them anyway
 
 ```bash
 # Global
@@ -154,21 +218,26 @@ skillshare update _repo --force -p  # Discard local changes
 | `--group, -G <name>` | Update all updatable skills in a group (repeatable) |
 | `--force, -f` | Discard local changes and force update |
 | `--dry-run, -n` | Preview without making changes |
-| `--skip-audit` | Skip post-update security audit gate |
+| `--skip-audit` | Skip security audit gate |
 | `--json` | JSON output |
 | `--diff` | Show file-level change summary after update |
 
 With `follow_source_links: true`, `update --all` skips followed Git checkouts,
 even with `--force`; update them by name instead.
 
-**Safety:** Tracked repos with uncommitted changes are skipped, and repos whose git status cannot be read fail. Use `--force` to override both.
+**Safety:** Tracked repos with uncommitted changes are skipped, and repos whose git status cannot be read fail. A remote skill whose files changed since install is skipped too; `check` reports it as `modified`. Use `--force` to override all three.
 
-**Security:** Updates roll back when findings reach the configured block threshold.
+Only one skillshare process updates a Git checkout at a time; another waits up to a minute, then fails with `another skillshare process is still updating <path>`.
+
+**Security:** Tracked updates (including `install --track --update`) pull and audit
+an isolated candidate, then publish the exact approved commit. Rejection or scan
+errors leave the active checkout and metadata unchanged; existing target links
+keep reading old content until approval. Publication is not an atomic multi-file switch.
 `--audit-threshold` / `--threshold` / `-T` overrides the threshold for the run.
-Explicit `--force` can discard local changes and override audit blocking;
+Explicit `--force` can discard local changes and override findings, but not scan errors;
 `--skip-audit` skips scanning. Review findings before selecting either override.
 
-**After update:** `skillshare sync`
+**After update:** `skillshare sync` applies remaining target changes. Existing symlinks already read updated source content; managed copies and added, removed, or renamed links may still need sync. The dashboard's Updates tab checks that kind's pending changes before offering **Sync Now**, reports when no sync is needed, and offers **Retry** if the check fails.
 
 ## uninstall
 
@@ -194,7 +263,8 @@ skillshare uninstall -G frontend -p --force
 # Preview
 skillshare uninstall --group frontend --dry-run
 
-# Global JSON output (skips confirmation; dirty tracked repos still require --force)
+# JSON output, global or -p (skips confirmation; dirty tracked repos still require --force;
+# when every skill fails, or any agent fails, it exits non-zero and "error" gives the reasons)
 skillshare uninstall my-skill --json
 ```
 
@@ -207,6 +277,43 @@ skillshare uninstall my-skill --json
 **Undo:** `skillshare trash restore <name>` to recover. See [trash.md](trash.md).
 
 **After uninstall:** `skillshare sync`
+
+## move
+
+Move installed skills, or whole folders, to another folder of the source, keeping install
+records, audit acceptances and (project mode) the lock pin and config group. Nothing is
+downloaded again. Use it instead of `mv` for installed skills.
+
+```bash
+skillshare move react-best-practices frontend      # Skill -> frontend/react-best-practices
+skillshare move pdf docx office                    # Several skills into office/
+skillshare move frontend archive                   # Folder -> archive/frontend/
+skillshare move archive/old-skill .                # Back to the source root
+skillshare move my-skill frontend --dry-run        # Preview
+skillshare move my-skill frontend -p --json        # Project mode, JSON output
+```
+
+The last argument is the destination folder relative to the skills source; `.` is the source
+root. A name resolves as exact skill path, exact folder path, flat name (`grp__demo`), then
+unique skill base name. A skill with nested skills moves with them.
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run, -n` | Preview, change nothing |
+| `--force, -f` | Accept a target-name collision only; never overwrites or moves tracked or linked content |
+| `--json` | JSON output: `moved`, `failed` (with `code`), `skipped`, `warnings`, `dry_run`, `duration` |
+| `--project, -p` / `--global, -g` | Select mode |
+
+Agents are not supported (no `--kind`). Refusals use stable codes in `failed[].code`:
+`skill_not_found`, `ambiguous_name`, `dest_exists` (never overwritten), `inside_tracked_repo`,
+`dest_inside_tracked_repo`, `linked_folder`, `dest_is_skill`, `invalid_dest`,
+`dest_inside_source_folder`, `duplicate_dest`, `overlapping_sources`, `same_folder` (no-op),
+`name_collision`, `ambiguous_record`. A folder holding a tracked repo is refused as a whole before anything is renamed.
+The exit code is non-zero when `failed` is not empty.
+
+**After move:** `skillshare sync`. Move does not sync, so old target links dangle until then.
+Target `include`/`exclude` filters match flat names and are not rewritten; `move` warns when a
+filter result changes.
 
 ## new
 

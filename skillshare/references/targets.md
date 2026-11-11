@@ -5,6 +5,14 @@ and MCP client support are identical.
 
 ## Global Targets
 
+Only a global OMP config entry with its skills path omitted follows
+`PI_CODING_AGENT_DIR`, after trimming whitespace. Empty or relative values use
+`~/.omp/agent/skills`. When the override matches a declared OMP account's
+`config_dir` (including a symlink), plain `omp` keeps the canonical default and
+the account's filters stay independent. Automatic OMP detection requires `~/.omp`. `init` and `target add` save the chosen destination;
+saved paths remain pinned. Explicit skills paths and account `config_dir` take
+precedence; project skills stay `.omp/skills`.
+
 ```bash
 skillshare target list                        # List all targets
 skillshare target claude                      # Show target info
@@ -14,10 +22,10 @@ skillshare target remove myapp                # Remove target (safe)
 ```
 
 Another account (`agent` + `config_dir` in config.yaml): `--agent` accepts `claude`
-(`CLAUDE_CONFIG_DIR`), `codex` (`CODEX_HOME`), `pi` and `omp` (both use
+(`CLAUDE_CONFIG_DIR`), `codex` (`CODEX_HOME`), `opencode` (`OPENCODE_CONFIG_DIR`), `pi` and `omp` (both use
 `PI_CODING_AGENT_DIR`). The skills path follows the directory (`<config_dir>/skills`
-for Codex, Pi and OMP, even though Codex also
-reads the shared `~/.agents/skills`); only Claude has an agents directory. Any number of
+for Codex, OpenCode, Pi and OMP, even though Codex also
+reads the shared `~/.agents/skills`); Claude and OpenCode also have an agents directory. Any number of
 accounts can be added, and the target name is also valid in `mcp.targets` and a server's
 `targets`. Optional `--cli <executable>` (`cli:` in config.yaml) runs the account's plugin
 commands with a compatible CLI, such as `omo` for Pi: a name on PATH or an absolute path, no
@@ -77,8 +85,10 @@ a folder an enabled target also writes to is left alone. `sync`/`diff`/`status`/
 skip the target's skills. `--skills` cannot be combined with include/exclude flags in one
 command. Works with `-p`.
 
-When `sync` warns that two targets "sync skills to <folder> with different filters, so each
-sync undoes the other", run the `skillshare target <name> --skills=false` it prints.
+When `sync` warns that two targets "sync skills to <folder> with different settings, so each
+sync undoes the other", run the `skillshare target <name> --skills=false` it prints. For a
+project target (`<project>@<tool>`) it prints `skillshare project edit <root> --target <other tools>`,
+which drops only that tool, or `--no-skills` when it is the project's only target.
 
 ## Project Targets (`-p`)
 
@@ -104,7 +114,7 @@ targets:
 
 ## Project Folders From the Global Config (`projects`)
 
-Use when projects should get **different** skills. Global targets already give every project the same set; project mode (`-p`) keeps the setup in the repo for teammates. For personal projects, list the folders in the global `config.yaml` instead of giving each a `.skillshare/`. One `skillshare sync` writes them all.
+Use when projects should get **different** skills. Global targets already give every project the same set; project mode (`-p`) keeps the setup in the repo for teammates. For personal projects, add folders with `skillshare project add`; they are saved under `projects:` in the global config, or on this machine only with `--machine-local`. One `skillshare sync` writes them all.
 
 ```yaml
 projects:
@@ -116,8 +126,53 @@ projects:
 
 - Shows up in `sync`/`status`/`diff` as `<name>@<target>` (e.g. `shop-web@claude`). Tools sharing a folder (`.agents/skills`) are one target.
 - A missing folder is skipped with a warning, never recreated.
-- `skillshare target` and `collect` ignore these; edit `config.yaml` or the dashboard's Projects page.
+- `skillshare target` and `collect` ignore these; use `skillshare project` or the dashboard's Projects page.
 - MCP for the same folders lives under `mcp.projects` (see [mcp.md](mcp.md)).
+
+### Manage projects with `project`
+
+```bash
+skillshare project list --json
+skillshare project show shop-web --json
+skillshare project add ~/work/shop-web --target claude,codex --skills-mode copy --agents --dry-run
+skillshare project add ~/work/shop-web --target claude,codex --skills-mode copy --agents --sync
+skillshare project edit shop-web --skills-include 'frontend-*' --skills-exclude=
+skillshare project edit shop-web --name= --skills-mode= --skills-naming=
+skillshare project sync shop-web --json
+skillshare project remove shop-web --dry-run --json
+skillshare project remove shop-web --yes --json
+skillshare project add ~/work/scratch --target claude --machine-local --dry-run
+skillshare project localize shop-web --dry-run --json
+skillshare project share scratch --dry-run --json
+```
+
+Always global (explicit `-g` accepted, `-p` rejected), even inside a project. Add requires
+an existing root and `--target` (repeat or comma list); skills default on, agents off.
+Show/edit/sync/remove accept an effective name or root; use `./path` to select a relative
+root explicitly. Ambiguous name/root matches fail instead of choosing one.
+
+Edit changes only supplied settings. `--target`, `--skills-include`, `--skills-exclude`,
+`--agents-include`, and `--agents-exclude` replace their lists; repeat filter flags for
+multiple patterns, use an empty value to clear. `--skills` / `--no-skills` and
+`--agents` / `--no-agents` toggle resources. Any resource setting turns on that resource
+when it is omitted from the project. Enabling an existing resource keeps its settings.
+`--skills-mode` / `--agents-mode` accept merge, symlink or copy; an empty value inherits.
+`--skills-naming` accepts flat, standard or prefixed; empty inherits. There is no agents
+naming flag, and agents filters with symlink mode are rejected.
+
+`--dry-run` / `-n` previews add/edit/sync/remove/localize/share without writes or prompts. `--sync`
+on add/edit saves first and syncs only that project, without force. On sync failure,
+exit 1 does not undo the saved registration: inspect `sync.failed` and retry with
+`project sync`. List JSON is `{ "projects": [] }`, show JSON wraps `project`, and
+mutation JSON includes `action`, `project`, `applied`, `affected`, and `warnings`.
+No-op edits report `applied: false, unchanged: true`.
+
+Removal asks for confirmation unless `--yes` or previewing; JSON removal requires
+`--yes` unless previewing. Whole-folder links are removed; merge links become local
+copies while source content exists; copy files remain and their manifest is removed.
+Agents stay. Inspect `detach` and `registration` after failure: earlier detaches can
+remain even when a later detach or save fails. There is no rollback. MCP and hooks
+project definitions are outside this command's scope.
 
 ## Target Filters
 
@@ -178,6 +233,7 @@ skillshare target claude --mode merge         # Per-skill symlinks (default)
 skillshare target claude --mode copy          # Real-file copies with manifest tracking
 skillshare target claude --mode symlink       # Entire dir symlinked
 skillshare target claude --mode copy -p       # Project target mode
+skillshare target claude --mode copy --target-naming prefixed  # Several settings are checked together and saved once
 ```
 
 | Mode | Description | Local Skills |
@@ -199,3 +255,16 @@ Unlink targets with `target remove`: it removes the link itself and leaves the l
 Inspect whether a path is a symlink before filesystem operations. Removing a symlink
 itself and traversing its target are different operations; `target remove` handles the
 managed relationship without requiring manual recursive deletion.
+
+Project add can be repeated with identical settings: it returns unchanged and
+still honors `--sync`. Different settings require `project edit`. Edits detach
+dropped skill paths, preserving paths owned by surviving enabled targets and
+all agent files. Partial failures report completed detach work and whether the
+registration was saved. CLI and dashboard project mutations share a config
+lock and reload after acquisition; other config writers remain outside it.
+
+## Where projects are saved
+
+A project is saved in `config.yaml` (`origin: shared`, default) or in this machine's registry (`origin: local`). `project add --machine-local` saves on this machine only; `projects_storage: machine-local` in `config.yaml` makes that the default, and `add --shared` overrides it. Edits and removals stay where the project is saved; removing a `config.yaml` project removes it for every machine using that file. A local entry replaces the whole `config.yaml` entry at a normalized root (`sharedCopy: true` in JSON); removing it deletes only the local copy, the `config.yaml` version applies again (`remaining` in JSON), and `remove --shared` deletes both. `localize` copies a `config.yaml` project to this machine without detach, sync, or `config.yaml` changes. `share` moves a local project into `config.yaml` and deletes the local copy; when `config.yaml` has different settings it asks, and needs `--yes` with `--json`. Both repeat as noops. Exclusions saved by v0.29.0 stay until the project is added again. JSON adds `origin` and `originPath`. All project commands skip startup maintenance. Storage: `$XDG_STATE_HOME/skillshare/projects/<identity>.yaml`, otherwise `~/.local/state/skillshare/projects` on Unix or `%LOCALAPPDATA%\skillshare\state\projects` on Windows. Identity follows the resolved config destination, so config symlink aliases share state. Moving the destination starts fresh. Reads create nothing; invalid state fails closed. Duplicate names at distinct roots and duplicate normalized roots in one layer fail.
+
+The dashboard Convert action writes `config.yaml` and refuses locally hidden or overridden roots. Raw editor submissions are validated with the local overlay. Project mutations lock and reload; candidates reject changed shared/local snapshots before detach or write. General shared writers do not use this concurrency guard.
